@@ -1,10 +1,13 @@
-/** @type {import("snowpack").SnowpackUserConfig } */
 export default {
   mount: {
-    /* ... */
+    public: '/',
+    src: '/dist',
   },
+  exclude: [
+    '**/node_modules/**/*', '**/.history/**/*'
+  ],
   plugins: [
-    /* ... */
+    '@snowpack/plugin-react-refresh'
   ],
   routes: [
     /* Enable an SPA Fallback in development: */
