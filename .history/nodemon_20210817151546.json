@@ -1,0 +1,10 @@
+{
+  "verbose": true,
+  "quiet": true,
+  "ext": "js json",
+  "watch": ["./**/*.*", "./src/**/*.*"],
+  "ignore": ["./src/tracker.js", "./public/**/*.*"],
+  "execMap": {
+    "js": "node --es-module-specifier-resolution=node ./app.js"
+  }
+}

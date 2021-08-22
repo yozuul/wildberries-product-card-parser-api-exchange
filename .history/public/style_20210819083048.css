@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Exo+2&display=swap');
+
+* {
+   font-family: 'Exo 2', sans-serif;
+}
+
+body {
+   padding: 0;
+   margin: 0;
+}
+.dn {
+   display: none;
+}
+.parser_form_wrapper {
+   margin-top: 50px;
+}
+#productDesc {
+   height: 210px;
+   resize: none;
+}
+
+/* .productFormWrapper, .parseFormWrapper {
+   max-width: 1200px;
+   margin: auto;
+   padding-top: 25px;
+   padding-bottom: 25px;
+}
+.parseFormWrapper {
+   border-bottom: 1px dotted #9999;
+}
+.productFormWrapper {
+   display: flex;
+}
+.productFormWrapperLeft {
+   margin-right: 50px;
+}
+.parseForm {
+   display: flex;
+   flex-wrap: wrap;
+   max-width: 550px;
+}
+.parseForm input {
+   width: 550px;
+   margin-bottom: 20px;
+}
+.productForm {
+}
+.productForm input, .productForm textarea {
+   width: 550px;
+}
+.productForm textarea {
+   height: 100px;
+   resize: none;
+}
+.parseFormWrapper p, .productFormWrapper p {
+   margin-bottom: 8px;
+   margin-top: 0;
+}
+.inputWrapper {
+   margin-bottom: 15px;
+} */
