@@ -4,9 +4,10 @@ class API {
       const apiHost = 'http://localhost:3000'
       return {
          parseCard: `${apiHost}/parseCard`,
+         createCard: `${apiHost}/createCard`,
          searchCategory: `${apiHost}/searchCategory`,
          searchTnved: `${apiHost}/searchTnved`,
-         addCard: `${apiHost}/addCard`,
+         genBarcodes: `${apiHost}/genBarcodes`,
       }
    }
 
@@ -26,6 +27,18 @@ class API {
       const searchTnved = this.apiURL.searchTnved
       const response = await this.fetch(data).post(searchTnved)
       return this.requestResult(response, searchTnved)
+   }
+
+   async createCard(data) {
+      const createCard = this.apiURL.createCard
+      const response = await this.fetch(JSON.stringify(data)).post(createCard)
+      return this.requestResult(response, createCard)
+   }
+
+   async genBarcodes(quantity) {
+      const genBarcodes = this.apiURL.genBarcodes
+      const response = await this.fetch(quantity).post(genBarcodes)
+      return this.requestResult(response, genBarcodes)
    }
 
    fetch(data) {

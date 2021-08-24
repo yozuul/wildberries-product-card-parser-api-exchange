@@ -1,3 +1,8 @@
+import fse from 'fs-extra'
+
+import { writeFile } from 'fs/promises';
+import { Buffer } from 'buffer';
+
 import Router from '@koa/router'
 
 import { Louncher } from '../parser'
@@ -7,15 +12,31 @@ import { WildberriesAPI } from '../api/wildberries'
 
 const router = new Router()
 
-router.post('/parseCard', async (ctx) => {
+router.post('/createCard', async (ctx) => {
    try {
-      ctx.body = await new Louncher().checkURL(ctx.request.body)
+      const createCard = await new WildberriesAPI().createCard(JSON.parse(ctx.request.body))
+      ctx.body = createCard
       ctx.status = 200
    }
    catch (err) {
       console.log('Error:', (err).red)
-      ctx.status = 500
-      ctx.body = 'Internal error at parseCard'
+      ctx.status = 500,
+      ctx.body = `Internal error at parseCard`
+   }
+})
+
+router.post('/parseCard', async (ctx) => {
+   try {
+      let parsedData =  await new Louncher().checkURL(ctx.request.body)
+      ctx.body = parsedData
+      ctx.status = 200
+      // console.log(JSON.parse(parsedData.source));
+      // writeJson(parsedData.source)
+   }
+   catch (err) {
+      console.log('Error:', (err).red)
+      ctx.status = 500,
+      ctx.body = `Internal error at parseCard`
    }
 })
 
@@ -26,8 +47,8 @@ router.post('/searchCategory', async (ctx) => {
    }
    catch (err) {
       console.log('Error:', (err).red)
-      ctx.status = 500
-      ctx.body = 'Internal error at parseCard'
+      ctx.status = 500,
+      ctx.body = `Internal error at searchCategory`
    }
 })
 
@@ -38,65 +59,31 @@ router.post('/searchTnved', async (ctx) => {
    }
    catch (err) {
       console.log('Error:', (err).red)
-      ctx.status = 500
-      ctx.body = 'Internal error at parseCard'
+      ctx.status = 500,
+      ctx.body = `Internal error at searchTnved`
    }
 })
 
-// router.get('/getAdditionalCardData', async (ctx) => {
-//    try {
-//       const result = await new WildberriesAPI().getAdditionalCardData({...ctx.request.body})
-//       console.log(result);
-//       // ctx.body = result || falseReturnAPI
-//       ctx.status = 200
-//    }
-//    catch (err) {
-//       console.log('Error:', (err).red)
-//       ctx.status = 500
-//       ctx.body = 'Internal error at getAdditionalCardData'
-//    }
-// })
+router.post('/genBarcodes', async (ctx) => {
+   try {
+      ctx.body = await new WildberriesAPI().getBarCode(ctx.request.body)
+      ctx.status = 200
+   }
+   catch (err) {
+      console.log('Error:', (err).red)
+      ctx.status = 500,
+      ctx.body = `Internal error at searchTnved`
+   }
+})
 
-
-// router.post('/addCard', async (ctx) => {
-//    try {
-//       const result = await new WildberriesAPI().saveCard({...ctx.request.body})
-//       // console.log(result);
-//       ctx.body = result || falseReturnAPI
-//       ctx.status = 200
-//    }
-//    catch (err) {
-//       console.log('Error:', (err).red)
-//       ctx.status = 500
-//       ctx.body = 'Internal at addCard error'
-//    }
-// })
-// router.get('/getTokenAPI', async (ctx) => {
-//    try {
-//       const result = await new Authorize().getCurrentToken()
-//       // console.log(result);
-//       ctx.body = result || falseReturnAPI
-//       ctx.status = 200
-//    }
-//    catch (err) {
-//       console.log('Error:', (err).red)
-//       ctx.status = 500
-//       ctx.body = 'Internal at addCard error'
-//    }
-// })
-// router.post('/updateTokenAPI', async (ctx) => {
-//    try {
-//       const result = await new Authorize().updateToken({...ctx.request.body})
-//       // console.log(result);
-//       ctx.body = result || falseReturnAPI
-//       ctx.status = 200
-//    }
-//    catch (err) {
-//       console.log('Error:', (err).red)
-//       ctx.status = 500
-//       ctx.body = 'Internal at addCard error'
-//    }
-// })
-
+async function writeJson(data) {
+   const tempFile = './.exports/temp.json'
+   try {
+      const buff = Buffer.from(data);
+      await writeFile(tempFile, buff)
+    } catch (err) {
+      console.error(err)
+    }
+}
 
 export { router }

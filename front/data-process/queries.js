@@ -2,15 +2,15 @@ import { query } from '../utils/query-helpers'
 
 // Поля форм
 const input = {
-   cardProductURL: query('#cardProductURL'),
-   cardProductName: query('#productName'),
-   cardProductBrand: query('#productBrand'),
-   cardProductPrice: query('#productPrice'),
+   productURL: query('#productURL'),
+   productName: query('#productName'),
+   productBrand: query('#productBrand'),
+   productPrice: query('#productPrice'),
    productConsist: query('#productConsist'),
-   productDesc: query('#productDesc'),
    searchProductCategory: query('#searchProductCategory'),
    watchSelectedCategory: query('#watchSelectedCategory'),
    productColor: query('#productColor'),
+   currentUUID: query('#currentUUID'),
 }
 // Селекты
 const select = {
@@ -32,16 +32,22 @@ const element = {
    productParams_wrapper: query('#productParams_wrapper'),
    productColor_wrapper: query('#productColor_wrapper'),
    searchProductTnved_wrapper: query('#searchProductTnved_wrapper'),
-   productParams_table: query('#productParams_table'),
+   productParams_table: query('#productParams_table tbody'),
    searchResultList: query('#searchResultList'),
+   productSizes_wrapper: query('#productSizes_wrapper'),
+   productSizes: query('#productSizes'),
+   notify: query('#notify'),
+   notifyHeader: query('#notifyHeader'),
+   notifyText: query('#notifyText'),
 }
 const textarea = {
-   cardProductDesc: query('#cardProductDesc')
+   productDesc: query('#productDesc')
 }
 // Кнопки
 const button = {
    parseCard: query('#parseCard'),
    saveCard: query('#saveCard'),
+   changeAutoFindedCategory: query('#changeAutoFindedCategory'),
 }
 
 export { button, element, input, select, textarea }

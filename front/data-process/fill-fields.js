@@ -1,6 +1,7 @@
+import API from '../services/api'
 import { DynamicSearch } from '../services/dynamic-search'
-import { element, input, select, textarea } from './queries'
-import { query, show, ChildsPush } from '../utils/index'
+import { button, element, input, select, textarea } from './queries'
+import { query, show, hide, ChildsPush, insert } from '../utils/index'
 
 // ЗАПОЛНЕНИЕ ПОЛЕЙ ПОЛУЧЕННЫМИ ДАННЫМИ
 
@@ -24,9 +25,10 @@ class FillFields {
       this.features(data)
       // ЧТО ПОЛУЧИЛИ ПО API:
       // Категория
-      const isCatFound = await this.category(data.extras.direcoryList)
-      // Если категория найдена автоматически, подгружаем список ТНВЭД
-      if(isCatFound) this.tnved(data.extras.tnvedList)
+      await this.category(data.extras.direcoryList)
+      // Размеры
+      this.sizes(data.source.nomenclatures)
+      input.currentUUID.value = this.parseData.extras.uuid
    }
 
    // Категории
@@ -40,7 +42,6 @@ class FillFields {
       } else {
          // Если нашли, заполняем данные
          const searchResult = data.result.data
-         show(element.productExtras_wrapper)
          const pushedData = new ChildsPush(select.productCategory)
          for (let foundedCat in searchResult) {
             const item = searchResult[foundedCat]
@@ -49,6 +50,11 @@ class FillFields {
             )
          }
          pushedData.insert()
+         show(element.productExtras_wrapper)
+         // Следим за изменением активной категории
+         this.watchCatChanged(select.productCategory.options[0])
+         // Открыть поиск категорий
+         this.showDynamicSearch()
          return true
       }
    }
@@ -57,21 +63,48 @@ class FillFields {
    async tnved(data) {
       const searchResult = data.result.data
       const pushedData = new ChildsPush(select.productTnved)
-      for(let foundedTnvd of searchResult) {
-         const code = foundedTnvd.tnvedCode
-         pushedData.collect(
-            `<option data-tnved-num="${code}">${code} ${foundedTnvd.description}</option>`
-         )
+      if(searchResult.length > 0) {
+         for(let foundedTnvd of searchResult) {
+            const code = foundedTnvd.tnvedCode
+            pushedData.collect(
+               `<option data-tnved-num="${code}">${code} ${foundedTnvd.description}</option>`
+            )
+         }
+         pushedData.insert()
+      } else {
+         console.log(searchResult);
       }
-      pushedData.insert()
+   }
+
+   // Размеры
+   sizes(data) {
+      let variationNum = 0
+      for (let product in data) {
+         if (variationNum < 1) {
+            const productItem = data[product]
+           let sizeNum = 0
+            for (let foundedSize in productItem.sizes) {
+               const item = productItem.sizes[foundedSize]
+               if ((item.sizeName !== 0) && (item.quantity !== 0)) {
+                  const sizeItem = `<div class="col form-control sizeCol" data-ru-size="${item.sizeNameRus}">${item.sizeName}</div>`
+                  insert(sizeItem).after.begin(element.productSizes)
+               }
+               if(sizeNum > 0) {
+                  show(element.productSizes_wrapper)
+               }
+               sizeNum++
+            }
+            variationNum++
+         }
+      }
    }
 
    // Наименование / бренд / цена / описание
    defaultField(data) {
       const commonDataFields = {
-         cardProductName: input.cardProductName,
-         cardProductBrand: input.cardProductBrand,
-         cardProductPrice: input.cardProductPrice
+         productName: input.productName,
+         productBrand: input.productBrand,
+         productPrice: input.productPrice
       }
       for(let input in commonDataFields) {
          commonDataFields[input].removeAttribute('readonly')
@@ -83,24 +116,22 @@ class FillFields {
          commonDataFields[input].value = data[input]
       }
       const detailDesc = data.details.desc
+      textarea.productDesc.removeAttribute('readonly')
       if(detailDesc) {
-         textarea.cardProductDesc.removeAttribute('readonly')
-         textarea.cardProductDesc.classList.add('max_height_desc')
-         textarea.cardProductDesc.value = detailDesc
+         textarea.productDesc.value = detailDesc
+         textarea.productDesc.classList.add('max_height_desc')
       }
    }
 
    // Изображения
    images(data) {
-      if(data.cardProductImages) {
-         element.productImages_wrapper.classList.remove('dn')
-         data.cardProductImages.reverse()
+      if(data.productImages) {
+         show(element.productImages_wrapper)
+         data.productImages.reverse()
          const imagesBlock = query('#productImages')
-         let imgNum = 0
-         for(let image of data.cardProductImages) {
+         for(let image of data.productImages) {
             const divTag = `<div class='col-3 imageItem'><img src="${image}"></div>`
             imagesBlock.insertAdjacentHTML('afterbegin', divTag)
-            imgNum++
          }
       }
    }
@@ -108,22 +139,22 @@ class FillFields {
    // Состав
    consist(data) {
       const detailConsist = data.details.consist
-      if(detailConsist) {
-         element.productConsist_wrapper.classList.remove('dn')
+      if(detailConsist !== 'null') {
+         show(element.productConsist_wrapper)
          input.productConsist.value = detailConsist
       } else {
-         element.productConsist_wrapper.classList.add('dn')
+         hide(element.productConsist_wrapper)
       }
    }
 
    // Цвет
    color(data) {
-      const productColor = data.cardProductColor
-      if(productColor) {
-         element.productColor_wrapper.classList.remove('dn')
+      const productColor = data.productColor
+      if(productColor !== 'null') {
+         show(element.productColor_wrapper)
          input.productColor.value = productColor
       } else {
-         element.productColor_wrapper.classList.add('dn')
+         hide(element.productColor_wrapper)
       }
    }
 
@@ -131,17 +162,53 @@ class FillFields {
    features(data) {
       const detailParams = data.details.params
       if(detailParams) {
-         element.productParams_wrapper.classList.remove('dn')
-
+         show(element.productParams_wrapper)
          for(let name in detailParams) {
-            const paramRow = `<tr><th>${name}</th><td>${detailParams[name]}</td></tr>`
+            const paramRow = `<tr><th contenteditable="true">${name}</th><td contenteditable="true">${detailParams[name]}</td></tr>`
             element.productParams_table.insertAdjacentHTML('afterbegin', paramRow)
          }
       } else {
-         element.productParams_wrapper.classList.add('dn')
+         hide(element.productParams_wrapper)
       }
    }
 
+   // Если меняется категория, ищем новый ТВЭНД
+   async watchCatChanged(currentCat) {
+      const currentCatTnved = await API.searchTnved(currentCat.getAttribute('data-cat-name'))
+      this.tnved(currentCatTnved)
+      select.productCategory.addEventListener('change', async () => {
+         const categoryOptions = select.productCategory.options
+         for(let cat of categoryOptions) {
+            if(cat.selected) {
+               const searchPattern = cat.getAttribute('data-cat-name')
+               const findedTvend = await API.searchTnved(searchPattern)
+               this.cleanSelect(select.productTnved)
+               this.tnved(findedTvend)
+            }
+         }
+      })
+   }
+
+   // Если надо изменить автоматичеки найденную категорию
+   showDynamicSearch() {
+      button.changeAutoFindedCategory.onclick = () => {
+         hide(element.productExtras_wrapper)
+         this.cleanSelect(select.productTnved)
+         this.cleanSelect(select.productCategory)
+         const search = new DynamicSearch()
+         show(element.productExtrasNotFound_wrapper)
+         search.watchField(input.searchProductCategory)
+      }
+   }
+
+   // Очищаем дочерние элементы
+   cleanSelect(parent) {
+      if(parent.firstChild) {
+         while(parent.firstChild) {
+            parent.firstChild.remove()
+         }
+      }
+   }
 }
 
 export { FillFields }

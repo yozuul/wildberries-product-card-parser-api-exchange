@@ -10,15 +10,10 @@ class WildberriesExtras {
       const API = new WildberriesAPI()
       const data = this.parseResult
       const uuidGen = uuidv4()
-
-      const direcoryList = await API.getDirectoryList(data.cardProductName)
-      const tnvedList = await API.getTnvedList(data.cardProductName)
-      const barcode = await API.getBarCode(uuidGen)
-
+      const pattern = data.productName.split(' ')[0]
+      const direcoryList = await API.getDirectoryList(pattern)
       return {
          direcoryList: direcoryList,
-         tnvedList: tnvedList,
-         barcode: barcode,
          uuid: uuidGen,
       }
    }

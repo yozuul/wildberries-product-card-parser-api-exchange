@@ -10,22 +10,22 @@ class Wildberries {
 
       const fields = {
          // Название товара
-         cardProductName: await page.evaluate(() => {
+         productName: await page.evaluate(() => {
             const query = '[data-link="text{:productCard^goodsName}"]'
             return document.querySelector(query).innerText
          }),
          // Цена товара
-         cardProductBrand: await page.evaluate(() => {
+         productBrand: await page.evaluate(() => {
             const query = '[data-link="text{:productCard^brandName}"]'
             return document.querySelector(query).innerText
          }),
          // Бренд
-         cardProductPrice: await page.evaluate(() => {
+         productPrice: await page.evaluate(() => {
             const query = '.price-block__final-price'
             return document.querySelector(query).innerText
          }),
          // Цвет
-         cardProductColor: await page.evaluate(() => {
+         productColor: await page.evaluate(() => {
             const query = '.same-part-kt__color .color'
             const chekcColor = document.querySelector(query)
             if(chekcColor) {
@@ -35,7 +35,7 @@ class Wildberries {
             }
          }),
          // Изображения
-         cardProductImages: await page.evaluate(() => {
+         productImages: await page.evaluate(() => {
             const domItem = []
 
             const query = '.swiper-wrapper .slide__content img'
@@ -85,7 +85,17 @@ class Wildberries {
             }
 
             return details
+         }),
+
+         source: await page.evaluate(() => {
+            const sourceCode = document.body.innerHTML
+            const splitLeft = sourceCode.split('ssrModel:')[1]
+            const splitRight = splitLeft.split('appVersion:')[0].trim()
+
+            const jsonData = splitRight.replace(/\,$/, "")
+            return JSON.parse(jsonData)
          })
+
       }
 
       if(fields) {
@@ -96,10 +106,10 @@ class Wildberries {
     }
 
     dataProcess(fields) {
-      const price = fields.cardProductPrice
+      const price = fields.productPrice
       const deleteSpaces = price.replace(/\s/g, '')
       const deleteCurrency = deleteSpaces.replace(/₽/g, '')
-      fields.cardProductPrice = deleteCurrency
+      fields.productPrice = deleteCurrency
       return fields
     }
 }

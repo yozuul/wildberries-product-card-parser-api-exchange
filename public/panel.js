@@ -6,9 +6,10 @@ class API {
       const apiHost = 'http://localhost:3000';
       return {
          parseCard: `${apiHost}/parseCard`,
+         createCard: `${apiHost}/createCard`,
          searchCategory: `${apiHost}/searchCategory`,
          searchTnved: `${apiHost}/searchTnved`,
-         addCard: `${apiHost}/addCard`,
+         genBarcodes: `${apiHost}/genBarcodes`,
       }
    }
 
@@ -28,6 +29,18 @@ class API {
       const searchTnved = this.apiURL.searchTnved;
       const response = await this.fetch(data).post(searchTnved);
       return this.requestResult(response, searchTnved)
+   }
+
+   async createCard(data) {
+      const createCard = this.apiURL.createCard;
+      const response = await this.fetch(JSON.stringify(data)).post(createCard);
+      return this.requestResult(response, createCard)
+   }
+
+   async genBarcodes(quantity) {
+      const genBarcodes = this.apiURL.genBarcodes;
+      const response = await this.fetch(quantity).post(genBarcodes);
+      return this.requestResult(response, genBarcodes)
    }
 
    fetch(data) {
@@ -93,15 +106,15 @@ const insert = (el) => {
 
 // Поля форм
 const input = {
-   cardProductURL: query('#cardProductURL'),
-   cardProductName: query('#productName'),
-   cardProductBrand: query('#productBrand'),
-   cardProductPrice: query('#productPrice'),
+   productURL: query('#productURL'),
+   productName: query('#productName'),
+   productBrand: query('#productBrand'),
+   productPrice: query('#productPrice'),
    productConsist: query('#productConsist'),
-   productDesc: query('#productDesc'),
    searchProductCategory: query('#searchProductCategory'),
    watchSelectedCategory: query('#watchSelectedCategory'),
    productColor: query('#productColor'),
+   currentUUID: query('#currentUUID'),
 };
 // Селекты
 const select = {
@@ -123,16 +136,22 @@ const element = {
    productParams_wrapper: query('#productParams_wrapper'),
    productColor_wrapper: query('#productColor_wrapper'),
    searchProductTnved_wrapper: query('#searchProductTnved_wrapper'),
-   productParams_table: query('#productParams_table'),
+   productParams_table: query('#productParams_table tbody'),
    searchResultList: query('#searchResultList'),
+   productSizes_wrapper: query('#productSizes_wrapper'),
+   productSizes: query('#productSizes'),
+   notify: query('#notify'),
+   notifyHeader: query('#notifyHeader'),
+   notifyText: query('#notifyText'),
 };
 const textarea = {
-   cardProductDesc: query('#cardProductDesc')
+   productDesc: query('#productDesc')
 };
 // Кнопки
 const button = {
    parseCard: query('#parseCard'),
    saveCard: query('#saveCard'),
+   changeAutoFindedCategory: query('#changeAutoFindedCategory'),
 };
 
 // ФОРМИРУЕМ СПИСКИ ДАННЫХ ИЗ ОБЪЕКТОВ
@@ -172,7 +191,7 @@ class FieldsCleaner {
    restoreMarkup() {
       // Восстанавливаем поля
       const restoreElement = [
-         input.cardProductName, input.cardProductBrand, input.cardProductPrice, textarea.cardProductDesc
+         input.productName, input.productBrand, input.productPrice, textarea.productDesc
       ];
       restoreElement.map((el) => {
          el.value = '';
@@ -181,19 +200,19 @@ class FieldsCleaner {
 
       // Очищаем поля
       const cleanElement = [
-         input.productConsist, input.productColor, input.watchSelectedCategory, textarea.cardProductDesc
+         input.productConsist, input.productColor, input.watchSelectedCategory, textarea.productDesc
       ];
       cleanElement.map((el) => el.value = '');
 
       // Элементы которые надо спрятать
       const hideElement = [
-         button.saveCard, element.productImages_wrapper, element.productParams_wrapper, element.productExtras_wrapper, element.productConsist_wrapper, element.productColor_wrapper, element.productExtrasNotFound_wrapper
+         button.saveCard, element.productImages_wrapper, element.productParams_wrapper, element.productExtras_wrapper, element.productConsist_wrapper, element.productColor_wrapper, element.productExtrasNotFound_wrapper, element.productSizes_wrapper
       ];
       hideElement.map((el) => hide(el));
 
       // Элементы у которых надо удалить дочерние элементы
       const cleanChilds = [
-         element.productImages, element.productParams_table, select.productCategory, select.productTnved, select.searchProductTnved
+         element.productImages, element.productParams_table, select.productCategory, select.productTnved, select.searchProductTnved, element.productSizes
       ];
       cleanChilds.map((parent) => {
          if(parent.firstChild) {
@@ -203,7 +222,7 @@ class FieldsCleaner {
          }
       });
 
-      textarea.cardProductDesc.classList.remove('max_height_desc');
+      textarea.productDesc.classList.remove('max_height_desc');
    }
 }
 
@@ -344,9 +363,10 @@ class FillFields {
       this.features(data);
       // ЧТО ПОЛУЧИЛИ ПО API:
       // Категория
-      const isCatFound = await this.category(data.extras.direcoryList);
-      // Если категория найдена автоматически, подгружаем список ТНВЭД
-      if(isCatFound) this.tnved(data.extras.tnvedList);
+      await this.category(data.extras.direcoryList);
+      // Размеры
+      this.sizes(data.source.nomenclatures);
+      input.currentUUID.value = this.parseData.extras.uuid;
    }
 
    // Категории
@@ -360,7 +380,6 @@ class FillFields {
       } else {
          // Если нашли, заполняем данные
          const searchResult = data.result.data;
-         show(element.productExtras_wrapper);
          const pushedData = new ChildsPush(select.productCategory);
          for (let foundedCat in searchResult) {
             const item = searchResult[foundedCat];
@@ -369,6 +388,11 @@ class FillFields {
             );
          }
          pushedData.insert();
+         show(element.productExtras_wrapper);
+         // Следим за изменением активной категории
+         this.watchCatChanged(select.productCategory.options[0]);
+         // Открыть поиск категорий
+         this.showDynamicSearch();
          return true
       }
    }
@@ -377,21 +401,48 @@ class FillFields {
    async tnved(data) {
       const searchResult = data.result.data;
       const pushedData = new ChildsPush(select.productTnved);
-      for(let foundedTnvd of searchResult) {
-         const code = foundedTnvd.tnvedCode;
-         pushedData.collect(
-            `<option data-tnved-num="${code}">${code} ${foundedTnvd.description}</option>`
-         );
+      if(searchResult.length > 0) {
+         for(let foundedTnvd of searchResult) {
+            const code = foundedTnvd.tnvedCode;
+            pushedData.collect(
+               `<option data-tnved-num="${code}">${code} ${foundedTnvd.description}</option>`
+            );
+         }
+         pushedData.insert();
+      } else {
+         console.log(searchResult);
       }
-      pushedData.insert();
+   }
+
+   // Размеры
+   sizes(data) {
+      let variationNum = 0;
+      for (let product in data) {
+         if (variationNum < 1) {
+            const productItem = data[product];
+           let sizeNum = 0;
+            for (let foundedSize in productItem.sizes) {
+               const item = productItem.sizes[foundedSize];
+               if ((item.sizeName !== 0) && (item.quantity !== 0)) {
+                  const sizeItem = `<div class="col form-control sizeCol" data-ru-size="${item.sizeNameRus}">${item.sizeName}</div>`;
+                  insert(sizeItem).after.begin(element.productSizes);
+               }
+               if(sizeNum > 0) {
+                  show(element.productSizes_wrapper);
+               }
+               sizeNum++;
+            }
+            variationNum++;
+         }
+      }
    }
 
    // Наименование / бренд / цена / описание
    defaultField(data) {
       const commonDataFields = {
-         cardProductName: input.cardProductName,
-         cardProductBrand: input.cardProductBrand,
-         cardProductPrice: input.cardProductPrice
+         productName: input.productName,
+         productBrand: input.productBrand,
+         productPrice: input.productPrice
       };
       for(let input in commonDataFields) {
          commonDataFields[input].removeAttribute('readonly');
@@ -403,20 +454,20 @@ class FillFields {
          commonDataFields[input].value = data[input];
       }
       const detailDesc = data.details.desc;
+      textarea.productDesc.removeAttribute('readonly');
       if(detailDesc) {
-         textarea.cardProductDesc.removeAttribute('readonly');
-         textarea.cardProductDesc.classList.add('max_height_desc');
-         textarea.cardProductDesc.value = detailDesc;
+         textarea.productDesc.value = detailDesc;
+         textarea.productDesc.classList.add('max_height_desc');
       }
    }
 
    // Изображения
    images(data) {
-      if(data.cardProductImages) {
-         element.productImages_wrapper.classList.remove('dn');
-         data.cardProductImages.reverse();
+      if(data.productImages) {
+         show(element.productImages_wrapper);
+         data.productImages.reverse();
          const imagesBlock = query('#productImages');
-         for(let image of data.cardProductImages) {
+         for(let image of data.productImages) {
             const divTag = `<div class='col-3 imageItem'><img src="${image}"></div>`;
             imagesBlock.insertAdjacentHTML('afterbegin', divTag);
          }
@@ -426,22 +477,22 @@ class FillFields {
    // Состав
    consist(data) {
       const detailConsist = data.details.consist;
-      if(detailConsist) {
-         element.productConsist_wrapper.classList.remove('dn');
+      if(detailConsist !== 'null') {
+         show(element.productConsist_wrapper);
          input.productConsist.value = detailConsist;
       } else {
-         element.productConsist_wrapper.classList.add('dn');
+         hide(element.productConsist_wrapper);
       }
    }
 
    // Цвет
    color(data) {
-      const productColor = data.cardProductColor;
-      if(productColor) {
-         element.productColor_wrapper.classList.remove('dn');
+      const productColor = data.productColor;
+      if(productColor !== 'null') {
+         show(element.productColor_wrapper);
          input.productColor.value = productColor;
       } else {
-         element.productColor_wrapper.classList.add('dn');
+         hide(element.productColor_wrapper);
       }
    }
 
@@ -449,72 +500,472 @@ class FillFields {
    features(data) {
       const detailParams = data.details.params;
       if(detailParams) {
-         element.productParams_wrapper.classList.remove('dn');
-
+         show(element.productParams_wrapper);
          for(let name in detailParams) {
-            const paramRow = `<tr><th>${name}</th><td>${detailParams[name]}</td></tr>`;
+            const paramRow = `<tr><th contenteditable="true">${name}</th><td contenteditable="true">${detailParams[name]}</td></tr>`;
             element.productParams_table.insertAdjacentHTML('afterbegin', paramRow);
          }
       } else {
-         element.productParams_wrapper.classList.add('dn');
+         hide(element.productParams_wrapper);
       }
    }
+
+   // Если меняется категория, ищем новый ТВЭНД
+   async watchCatChanged(currentCat) {
+      const currentCatTnved = await API$1.searchTnved(currentCat.getAttribute('data-cat-name'));
+      this.tnved(currentCatTnved);
+      select.productCategory.addEventListener('change', async () => {
+         const categoryOptions = select.productCategory.options;
+         for(let cat of categoryOptions) {
+            if(cat.selected) {
+               const searchPattern = cat.getAttribute('data-cat-name');
+               const findedTvend = await API$1.searchTnved(searchPattern);
+               this.cleanSelect(select.productTnved);
+               this.tnved(findedTvend);
+            }
+         }
+      });
+   }
+
+   // Если надо изменить автоматичеки найденную категорию
+   showDynamicSearch() {
+      button.changeAutoFindedCategory.onclick = () => {
+         hide(element.productExtras_wrapper);
+         this.cleanSelect(select.productTnved);
+         this.cleanSelect(select.productCategory);
+         const search = new DynamicSearch();
+         show(element.productExtrasNotFound_wrapper);
+         search.watchField(input.searchProductCategory);
+      };
+   }
+
+   // Очищаем дочерние элементы
+   cleanSelect(parent) {
+      if(parent.firstChild) {
+         while(parent.firstChild) {
+            parent.firstChild.remove();
+         }
+      }
+   }
+}
+
+// ПОДГОТОВКА ДАННЫХ ДЛЯ ДОБАВЛЕНИЕ КАРТОЧКИ
+
+class PrepareData {
+  constructor(parseData, updates) {
+    this.parseData = parseData;
+    this.updates = updates;
+  }
+  collect() {
+    // console.log(this.parseData);
+    // console.log(this.updates);
+    // console.log(this.bodyObject());
+    return this.bodyObject()
+  }
+
+
+ checkMultiple(value) {
+    let multipleParams = [];
+    const trySplit = value.split('; ');
+    if(trySplit[1]) {
+      let index = 1;
+      for(let item of trySplit) {
+        if(index < 3) {
+          multipleParams.push({value: item});
+        }
+        index++;
+      }
+      return multipleParams
+    } else {
+      return value
+    }
+ }
+
+ checkUnits(value) {
+     const patternName = {
+       sm: ' см', sm2: ' см', gr: ' г', kg: ' кг', mm: ' мм', mp: ' Мп', mhz: ' МГц'
+     };
+     const unitCheck = (str) => {
+       return {
+        sm: str.slice(-3), sm2: str.slice(-3), gr: str.slice(-2), kg: str.slice(-3),
+        mm: str.slice(-3), mp: str.slice(-3), mhz: str.slice(-4)
+       }
+     };
+     for (let unit in patternName) {
+       const pattern = unitCheck(value)[unit];
+       if (pattern == patternName[unit]) {
+         const unitValue = value.split(pattern)[0];
+         if(parseInt(unitValue)) {
+          //  console.log('value', value);
+          //  console.log('unitValue', unitValue);
+            return unitValue
+         }
+       }
+     }
+ }
+
+ collectFeautures(data) {
+   const paramsData = [];
+   const feauturesData = data;
+
+   let feauturesParams = {};
+   for (const feauture in feauturesData) {
+     if ((feauture !== 'Страна производства') && (feauture)) {
+       console.log(feauture);
+       const value = feauturesData[feauture];
+       // console.log('value', value);
+       const checked = this.checkType(value);
+       // console.log('checked', checked);
+       if (checked) {
+         feauturesParams[feauture] = {
+           type: feauture,
+           params: checked
+         };
+       }
+     }
+   }
+   for (let param in feauturesParams) {
+     paramsData.push(feauturesParams[param]);
+   }
+   // console.log('paramsData', paramsData);
+   // console.log(paramsData);
+   return paramsData
+ }
+
+ checkType(value) {
+    let result = [];
+    // Если есть единицы измерения
+    const isUnit = this.checkUnits(value);
+    // console.log(value);
+    if(isUnit) {
+      result.push({value: isUnit});
+      return result
+      // console.log('isUnit result', result);
+    }
+    // // Если значений несколько
+    const isMultiply = this.checkMultiple(value);
+    if(isMultiply) {
+      if(typeof isMultiply !== 'string') {
+        result = isMultiply;
+        return result
+        // console.log('isMultiply', isMultiply)
+      } else {
+        result.push({ value: value});
+        return result
+      }
+    }
+    // console.log('value', value);
+    // console.log('result', result);
+ }
+
+  bodyObject() {
+    const vendorCode = Math.floor(Math.random() * 1000000000);
+    const { inputsData, feautures, selectData, sizesData, barcodes } = this.updates;
+    const body = {
+      params: {
+        card: {
+          countryProduction: feautures['Страна производства'],
+          object: selectData.productCategory,
+          addin: [{...this.getConsist(inputsData.productConsist)},
+            { type: "Бренд",
+              params: [{ value: inputsData.productBrand}]
+            },
+            { type: "Тнвэд",
+              params: [{ value: selectData.productTnved }]
+            },
+            ...this.collectFeautures(feautures)
+          ],
+          nomenclatures: [{
+            vendorCode:  vendorCode.toString(),
+            variations: this.getVariations({
+                barcodes: barcodes,
+                name: inputsData.productName,
+                price: inputsData.productPrice,
+                sizes: sizesData
+              }),
+              addin: [{...this.getImages(this.parseData.productImages)}]
+            }
+          ]
+        }
+      },
+      id: this.parseData.extras.uuid,
+      jsonrpc: '2.0'
+    };
+    return body
+  }
+
+  // Размеры
+  getVariations(data) {
+    let variationsData = '';
+    if (data.sizes) {
+       variationsData = this.sizeVariation(data);
+    } else {
+       variationsData = this.defaultVariation(data);
+    }
+    return variationsData
+ }
+
+ defaultVariation(data) {
+   const product = [{
+     barcode: data.barcodes[0],
+     addin: [
+       {
+       type: "Розничная цена",
+       params: [{ count: parseInt(data.price) }]
+      }
+    ]
+   }];
+   return product
+ }
+
+ sizeVariation(data) {
+   let variationsData = [];
+   let index = 0;
+   for (let size in data.sizes) {
+     variationsData.push(
+      { barcode: data.barcodes[index],
+        addin: [
+          { type: "Розничная цена",
+            params: [{ count: parseInt(data.price) }]
+          },
+          { type: 'Размер',
+            params: [{ value: size.toUpperCase() }]
+          },
+          { type: "Рос. размер",
+            params: [{ value: data.sizes[size] }]
+          },
+        ]
+      });
+     index++;
+   }
+   return variationsData
+ }
+
+  // Фотки
+  getImages(data) {
+    const images = { type: 'Фото', params: [] };
+    for (let image of data.reverse()) {
+      images.params.push({ value: image });
+    }
+    return images
+  }
+
+  // Состав
+  getConsist(data) {
+    const consist = { type: "Состав", params: [] };
+    if (data) {
+       const multipleConsists = data.split(', ');
+        for (let item of multipleConsists) {
+           const spaceIndex = item.lastIndexOf(' ');
+           consist.params.push({
+              value: item.slice(0, spaceIndex),
+              count: parseInt(item.slice(spaceIndex + 1, -1))
+           });
+        }
+        return consist
+    } else {
+       return {}
+    }
+  }
 
 }
 
 // СОБИРАЕМ ОТРЕДАКТИРОВАННЫЕ В ПАНЕЛИ ДАННЫЕ
 
 class ChangedData {
-   constructor(params) {
-      this.params = params;
+
+   async collect() {
+      const sizes = this.sizes();
+      const sizeNum = Object.keys(sizes).length;
+      let barcodeNums = 1;
+      if(sizeNum > 0) {
+         barcodeNums = sizeNum;
+      }
+      return {
+         inputsData: this.inputsValue(),
+         selectData: this.selectValue(),
+         feautures: this.feautures(),
+         sizesData: sizes,
+         barcodes: await API$1.genBarcodes(barcodeNums.toString())
+      }
    }
-   get collect() {
 
+   inputsValue() {
+      const inputFields = [
+         input.productName, input.productBrand, input.productPrice, input.productConsist, textarea.productDesc, input.productColor, input.searchProductCategory
+      ];
+
+      let inputData = {};
+      for(let input of inputFields) {
+         if(input.value) {
+            const inputID = input.getAttribute('id');
+            inputData[inputID] = input.value;
+         }
+      }
+      // console.log(inputData)
+      return inputData
    }
 
-   inputFields() {
+   selectValue() {
+      let selectData = {};
+      if(this.visible(element.productExtras_wrapper)) {
+         selectData.productCategory = this.cleanOption.category(select.productCategory.value);
+         selectData.productTnved = this.cleanOption.tnved(select.productTnved.value);
+      }
+      if(this.visible(element.productExtrasNotFound_wrapper)) {
+         selectData.productCategory = this.cleanOption.category(input.searchProductCategory.value);
+         selectData.productTnved = this.cleanOption.tnved(select.searchProductTnved.value);
+      }
+      // console.log(selectData)
+      return selectData
+   }
 
+   feautures() {
+      let feauturesData = {};
+      for(let feauture of element.productParams_table.children) {
+         feauturesData[feauture.children[0].innerText] = feauture.children[1].innerText;
+      }
+      // console.log(feauturesData)
+      return feauturesData
+   }
+
+   sizes() {
+      let sizesData = {};
+      if(this.visible(element.productSizes_wrapper)) {
+         for(let size of element.productSizes.children) {
+            sizesData[size.innerText] = size.getAttribute('data-ru-size');
+         }
+         return sizesData
+      } else {
+         return false
+      }
+   }
+
+   get cleanOption() {
+      return {
+         category: (val) => val.split(' --')[0],
+         tnved: (val) => val.split(' -')[0]
+      }
+   }
+
+   visible(el) {
+      if(el.classList.contains('dn')) {
+         return false
+      } else {
+         return true
+      }
    }
 }
+
+class Notifier {
+   error(data) {
+      this.toggle('error');
+      element.notifyHeader.innerText = `Код ошибки: ${data.head}`;
+      element.notifyText.innerText = `Wildberries response: \n${data.body}`;
+   }
+   correct(text) {
+      this.toggle();
+      element.notifyHeader.innerText = `Операция выполнена`;
+      element.notifyText.innerText = text;
+   }
+   toggle(type) {
+      let timeOut = 3000;
+      if(type == 'error') {
+         hide(button.parseCard);
+         hide(button.saveCard);
+         timeOut = 4000;
+         element.notifyText.classList.add('error');
+      }
+      const popup = () => {
+         element.notify.classList.remove('show');
+         element.notifyText.classList.remove('error');
+         show(button.parseCard);
+         show(button.saveCard);
+      };
+      setTimeout(popup, timeOut);
+      element.notify.classList.add('show');
+   }
+}
+
+const Notify = new Notifier();
 
 // УПРАВЛЕНИЕ НАНЕЛЬЮ ПАРСИНГА
 
 class ParsePanel {
    // Подключаем кнопки Спарсить и Добавить
-   registerButtons() {
-      this.parseButtonControl();
-      this.addProductButtonControl();
-   }
-
-   // Кнопка парсинга
-   parseButtonControl() {
+   async registerButtons() {
       button.parseCard.onclick = async () => {
          // Убеждаемся что предыдущий данные очищены
          FieldsCleaner$1.restoreMarkup();
          // Включаем спиннер
          fetchSpinner('on');
          // Парсим карточку
-         let parseData = await API$1.parseCard(input.cardProductURL.value);
+         const parseData = await API$1.parseCard(input.productURL.value);
          // Заполняем полученными данными поля в панели
          new FillFields(parseData).passData();
-         // Показываем кнопку добавления карточки
-         button.saveCard.classList.remove('dn');
-         // Выключаем спиннер
+         // // Показываем кнопку добавления карточки
+         show(button.saveCard);
+         // // Выключаем спиннер
          fetchSpinner('off');
+         // Передаём данные парсинга для добавления
+         this.addProductButtonControl(parseData);
       };
    }
-
    // Кнопка сохранения карточки
-   addProductButtonControl() {
+   addProductButtonControl(parseData) {
       button.saveCard.onclick = async () => {
-         new ChangedData().collect;
-         // const updatedFields = this.getUpdatedFields()
-         // const objectData = this.prepareObjectData(this.parseData, updatedFields)
-         // const addCard = await this.apiFetch(this.api.addCard, objectData)
-         // console.log(objectData);
+         if(this.checkCategory()) {
+            // Собираем изменённые данные с полей
+            const updatedFields = await new ChangedData().collect();
+            // Формируем тело запроса
+            const postData = new PrepareData(parseData, updatedFields).collect();
+            console.log('updatedFields', updatedFields);
+            console.log('postData', postData);
+            // Отправляем карточку в Wildberries
+            const response = await API$1.createCard(postData);
+            this.notifiers.wdError(response);
+         } else {
+            this.notifiers.error('Добавьте категорию');
+         }
       };
    }
-}
 
+   get notifiers() {
+      return {
+         error: (reason) => {
+            Notify.error({ head: 'Ошибка', body: reason });
+         },
+         correct: (reason) => {
+            Notify.correct(reason);
+         },
+         wdError(response) {
+            if(response.error) {
+               Notify.error({
+                  head: response.error.code.toString(),
+                  body: response.error.data.cause.err
+               });
+            }
+            if(!response.error) {
+               Notify.correct('Wildberries response: карточка успешно добавлена');
+            }
+         }
+      }
+   }
+
+   checkCategory() {
+      const visible = (el) => {
+         if(el.classList.contains('dn')) {
+            return false
+         } else { return true }
+      };
+      if(visible(element.productExtrasNotFound_wrapper)) {
+         if(!input.searchProductCategory.value) {
+            input.searchProductCategory.classList.add('error-require');
+            return false
+         } else { return true }
+      } else { return true }
+   }
+
+}
 
 new ParsePanel().registerButtons();

@@ -16,7 +16,9 @@ class Louncher {
    async checkDonor(url, checked) {
       const browser = await this.startBrowser()
       if(checked.donorName == 'wildberries') {
-         return await this.checkWildberriesURL(url, browser, checked.urlType)
+         const data = await this.checkWildberriesURL(url, browser, checked.urlType)
+         await browser.close()
+         return data
       }
    }
 

@@ -1,5 +1,9 @@
+import {} from 'dotenv/config'
 import axios from 'axios'
+import { v4 as uuidv4 } from 'uuid'
 import { isCyrillic } from '../utils'
+
+import { green, darkGray, red } from 'ansicolor'
 
 class WildberriesAPI {
    constructor() {
@@ -23,7 +27,7 @@ class WildberriesAPI {
          return this.processResponse(response, 'category')
       } catch (error) {
          console.error(error);
-         console.log(`Ошибка получения категорий Wildberries по паттерну: ${pattern}`);
+         console.log((`Ошибка получения категорий Wildberries по паттерну: ${pattern}`).red);
       }
    }
 
@@ -35,36 +39,62 @@ class WildberriesAPI {
          const response = await this.fetchData.get(url)
          return this.processResponse(response, 'tnved')
       } catch (error) {
-         console.error(error);
-         console.log(`Ошибка получения ТНВЭД Wildberries по паттерну: ${pattern}`);
+         // console.error(error);
+         console.log((`Ошибка получения ТНВЭД Wildberries по паттерну: ${pattern}`).red);
       }
    }
 
    // Генерирование штрихкода
-   async getBarCode(uuid) {
-      const url = `card/getBarcodes`
+   async getBarCode(quantity) {
+      const url = 'card/getBarcodes'
+      const uuid = uuidv4()
       const data = {
          id: uuid,
-         params: { quantity: 1 },
+         params: { quantity: parseInt(quantity) },
          jsonrpc: '2.0'
       }
-      const response = await this.fetchData.post(url, data)
-      const resData = response.data
-
-      if((resData.id)&&(resData.id == uuid)) {
-         return resData.result.barcodes[0]
+      try {
+         const response = await this.fetchData.post(url, data)
+         const resData = response.data
+         if((resData.id)&&(resData.id == uuid)) {
+            return resData.result.barcodes
+         }
+      } catch (error) {
+         const errText = 'Ошибка генерирования штрихкода'
+         // console.error(error);
+         console.log((errText).red)
       }
    }
 
+   async createCard(data) {
+      const url = 'card/create'
+      try {
+         const response = await this.fetchData.post(url, data)
+         console.log(response.data)
+         return await response.data
+      }  catch (error) {
+         const errText = 'Ошибка добавления карточки'
+         // console.error(error);
+         console.log((errText).red)
+      }
+    }
+
    // Обработка результатов поиска в справочниках
    async processResponse(response, dirName) {
-
-      const data = response.data
-      const status = response.status
       // const headers = response.headers
       // const config = response.config
+      const data = response.data
+      const status = response.status
 
       let responseData = {}
+
+      // Обработка ответа добавления карточки
+      // if(dirName == 'saveCard') {
+      //    console.log(headers);
+      //    console.log(status);
+      //    console.log(data);
+      //    return { add: true }
+      // }
 
       // Обработка ответа от справочника Категорий
       if(dirName == 'category') {
