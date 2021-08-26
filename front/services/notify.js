@@ -8,6 +8,7 @@ class Notifier {
       element.notifyText.innerText = `Wildberries response: \n${data.body}`
    }
    correct(text) {
+      element.notifyText.classList.remove('error')
       this.toggle()
       element.notifyHeader.innerText = `Операция выполнена`
       element.notifyText.innerText = text
@@ -22,7 +23,6 @@ class Notifier {
       }
       const popup = () => {
          element.notify.classList.remove('show')
-         element.notifyText.classList.remove('error')
          show(button.parseCard)
          show(button.saveCard)
       }

@@ -27,7 +27,7 @@ class TypeURL {
    }
 
    wildberriesTypeURL(url) {
-      if(url.split('detail.aspx')[1]) {
+      if(url.split('detail.asp')[1]) {
          return 'product_card'
       } else {
          return false

@@ -6,35 +6,44 @@ class API {
          parseCard: `${apiHost}/parseCard`,
          createCard: `${apiHost}/createCard`,
          searchCategory: `${apiHost}/searchCategory`,
+         searchFeautures: `${apiHost}/searchFeautures`,
          searchTnved: `${apiHost}/searchTnved`,
          genBarcodes: `${apiHost}/genBarcodes`,
+         saveToken: `${apiHost}/saveToken`,
       }
    }
 
-   async parseCard(data) {
-      const parseCard = this.apiURL.parseCard
-      const response = await this.fetch(data).post(parseCard)
-      return this.requestResult(response, parseCard)
+   async saveToken(data) {
+      const saveToken = this.apiURL.saveToken
+      const response = await this.fetch(data).post(saveToken)
+      return {save: 'ok'}
+      // return await this.requestResult(response, saveToken)
    }
-
+   async searchFeautures(data) {
+      const searchFeautures = this.apiURL.searchFeautures
+      const response = await this.fetch(data).post(searchFeautures)
+      return await this.requestResult(response, searchFeautures)
+   }
    async searchCategory(data) {
       const searchCategory = this.apiURL.searchCategory
       const response = await this.fetch(data).post(searchCategory)
       return this.requestResult(response, searchCategory)
    }
-
    async searchTnved(data) {
       const searchTnved = this.apiURL.searchTnved
       const response = await this.fetch(data).post(searchTnved)
       return this.requestResult(response, searchTnved)
    }
-
+   async parseCard(data) {
+      const parseCard = this.apiURL.parseCard
+      const response = await this.fetch(data).post(parseCard)
+      return this.requestResult(response, parseCard)
+   }
    async createCard(data) {
       const createCard = this.apiURL.createCard
       const response = await this.fetch(JSON.stringify(data)).post(createCard)
       return this.requestResult(response, createCard)
    }
-
    async genBarcodes(quantity) {
       const genBarcodes = this.apiURL.genBarcodes
       const response = await this.fetch(quantity).post(genBarcodes)

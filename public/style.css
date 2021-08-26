@@ -106,7 +106,9 @@ input.error-require {
    display: flex;
    flex-direction: column;
 } */
-
+#productFeaut_wrapper .form-control {
+   font-size: .9rem;
+}
 #productSizes {
    display: inline-flex;
    flex-wrap: wrap;
@@ -122,7 +124,37 @@ input.error-require {
    margin-right: 10px;
    max-width: 70px;
 }
-
+.addedFeautures {
+   position: relative;
+}
+.removeFeauture {
+   position: absolute;
+   right: 5px;
+   top: 0;
+}
+.addedFeautures {
+   display: inline-block;
+}
+.addedFeautures {
+   background-color: #e9ecef;
+   padding: 2px 30px 5px 10px;
+   border-radius: 3px;
+   margin-right: 10px;
+   margin-bottom: 10px;
+}
+.addedFeautures button {
+   border: none;
+   outline: none;
+   padding: 0;
+   width: 20px;
+   height: 30px;
+   background: none;
+   line-height: 30px;
+}
+#productFeaut_wrapper ul {
+   margin-top: -10px;
+   margin-bottom: .8rem;
+}
 /* .productFormWrapper, .parseFormWrapper {
    max-width: 1200px;
    margin: auto;

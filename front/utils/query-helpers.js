@@ -6,7 +6,12 @@ const insert = (el) => {
    return {
       after: {
          begin: (parent) => {
-            parent.insertAdjacentHTML('afterBegin', el);
+            parent.insertAdjacentHTML('afterbegin', el);
+         }
+      },
+      before: {
+         end: (parent) => {
+            parent.insertAdjacentHTML('beforeend', el);
          }
       }
    }

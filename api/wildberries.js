@@ -15,7 +15,22 @@ class WildberriesAPI {
    }
 
    // Поиск категорий
-   async getDirectoryList(pattern) {
+   async searchFeautures(pattern) {
+      const encode = encodeURI(pattern)
+      const url = `api/v1/config/get/object/translated?name=${encode}`
+      try {
+         const response = await this.fetchData.get(url)
+         return this.processResponse(response, 'searchFeautures')
+      } catch (error) {
+         console.error(error);
+         console.log((`Ошибка получения характеристик Wildberries по паттерну: ${pattern}`).red);
+      }
+      return {res: 'ok'}
+   }
+
+   // Поиск категорий
+   async getDirectoryList(patternFull) {
+      const pattern = patternFull.slice(0, patternFull.length - 1)
       let lang = 'ru'
       if (!isCyrillic(pattern.split(' ')[0])) lang = 'en'
 
@@ -28,6 +43,10 @@ class WildberriesAPI {
       } catch (error) {
          console.error(error);
          console.log((`Ошибка получения категорий Wildberries по паттерну: ${pattern}`).red);
+         return {
+            type: 'error',
+            text: `Ошибка получения категорий Wildberries по паттерну: ${pattern}`
+         }
       }
    }
 
@@ -70,7 +89,6 @@ class WildberriesAPI {
       const url = 'card/create'
       try {
          const response = await this.fetchData.post(url, data)
-         console.log(response.data)
          return await response.data
       }  catch (error) {
          const errText = 'Ошибка добавления карточки'
@@ -89,15 +107,15 @@ class WildberriesAPI {
       let responseData = {}
 
       // Обработка ответа добавления карточки
-      // if(dirName == 'saveCard') {
-      //    console.log(headers);
-      //    console.log(status);
-      //    console.log(data);
-      //    return { add: true }
+      // if(dirName == 'searchFeautures') {
+         // console.log(response.headers);
+         // console.log(response.status);
+         // console.log(data.data.addin);
+         // return { add: true }
       // }
 
       // Обработка ответа от справочника Категорий
-      if(dirName == 'category') {
+      if((dirName == 'category')||(dirName == 'searchFeautures')) {
          const rquestData = Object.keys(data.data)[0] ? data.data : null
          const searchResult = rquestData ? true : false
          responseData = {

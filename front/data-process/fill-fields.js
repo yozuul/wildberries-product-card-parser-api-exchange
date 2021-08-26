@@ -1,7 +1,9 @@
 import API from '../services/api'
 import { DynamicSearch } from '../services/dynamic-search'
+import { FeautureData } from '../data-process/fetch-features'
 import { button, element, input, select, textarea } from './queries'
 import { query, show, hide, ChildsPush, insert } from '../utils/index'
+import { NormalizeFeauture } from './feautures-normalizer'
 
 // ЗАПОЛНЕНИЕ ПОЛЕЙ ПОЛУЧЕННЫМИ ДАННЫМИ
 
@@ -9,7 +11,6 @@ class FillFields {
    constructor(parseData) {
       this.parseData = parseData
    }
-
    async passData() {
       const data = this.parseData
       // ЧТО СПАРСИЛИ:
@@ -22,13 +23,26 @@ class FillFields {
       // Цвет
       this.color(data)
       // Характеристики
-      this.features(data)
+      this.features(data.details.params)
       // ЧТО ПОЛУЧИЛИ ПО API:
       // Категория
       await this.category(data.extras.direcoryList)
       // Размеры
       this.sizes(data.source.nomenclatures)
       input.currentUUID.value = this.parseData.extras.uuid
+   }
+
+   features(params) {
+      const normalizer = new NormalizeFeauture()
+      let objectNum = 'one'
+      for(let paramName in params) {
+         let pasteData = params[paramName]
+         const normalized = normalizer.checkUnits(params[paramName])
+         normalized ? pasteData = normalized : ''
+         if(pasteData.split(';').length > 0) objectNum = 'multiple'
+         const input = `<input class="${objectNum}" type="text" feauture-name="${paramName}" value="${pasteData}">`
+         insert(input).after.begin(element.parsedFeautures_wrapper)
+      }
    }
 
    // Категории
@@ -52,7 +66,11 @@ class FillFields {
          pushedData.insert()
          show(element.productExtras_wrapper)
          // Следим за изменением активной категории
-         this.watchCatChanged(select.productCategory.options[0])
+         const activeCat = select.productCategory.options[0]
+         this.watchCatChanged(activeCat)
+         // Подгружаем данные характеристик
+         const loadedFeautures = await API.searchFeautures(activeCat.getAttribute('data-cat-name'))
+         new FeautureData(loadedFeautures.result.data).push()
          // Открыть поиск категорий
          this.showDynamicSearch()
          return true
@@ -78,28 +96,26 @@ class FillFields {
 
    // Размеры
    sizes(data) {
-      let variationNum = 0
+      let filterSizes = {}
       for (let product in data) {
-         if (variationNum < 1) {
-            const productItem = data[product]
-           let sizeNum = 0
-            for (let foundedSize in productItem.sizes) {
-               const item = productItem.sizes[foundedSize]
-               if ((item.sizeName !== 0) && (item.quantity !== 0)) {
-                  const sizeItem = `<div class="col form-control sizeCol" data-ru-size="${item.sizeNameRus}">${item.sizeName}</div>`
-                  insert(sizeItem).after.begin(element.productSizes)
-               }
-               if(sizeNum > 0) {
-                  show(element.productSizes_wrapper)
-               }
-               sizeNum++
+         const sizes = data[product].sizes
+         const firstItemID = Object.keys(sizes)[0]
+         const firsItemSize = sizes[firstItemID].sizeName
+         if(firsItemSize !== 0) {
+            for(let item in sizes) {
+               const size = sizes[item]
+               filterSizes[size.sizeName] = size.sizeNameRus
             }
-            variationNum++
          }
       }
+      for(let sizeName in filterSizes) {
+         const sizeItem = `<div class="col form-control sizeCol" data-ru-size="${filterSizes[sizeName]}">${sizeName}</div>`
+         insert(sizeItem).after.begin(element.productSizes)
+      }
+      show(element.productSizes_wrapper)
    }
 
-   // Наименование / бренд / цена / описание
+   // Наименование / бренд / цена / описание / Страна
    defaultField(data) {
       const commonDataFields = {
          productName: input.productName,
@@ -111,10 +127,6 @@ class FillFields {
          commonDataFields[input].value = data[input]
       }
 
-      for(let input in commonDataFields) {
-         commonDataFields[input].removeAttribute('readonly')
-         commonDataFields[input].value = data[input]
-      }
       const detailDesc = data.details.desc
       textarea.productDesc.removeAttribute('readonly')
       if(detailDesc) {
@@ -150,25 +162,11 @@ class FillFields {
    // Цвет
    color(data) {
       const productColor = data.productColor
-      if(productColor !== 'null') {
+      if((productColor) && (productColor !== 'null')) {
          show(element.productColor_wrapper)
          input.productColor.value = productColor
       } else {
          hide(element.productColor_wrapper)
-      }
-   }
-
-   // Характеристики
-   features(data) {
-      const detailParams = data.details.params
-      if(detailParams) {
-         show(element.productParams_wrapper)
-         for(let name in detailParams) {
-            const paramRow = `<tr><th contenteditable="true">${name}</th><td contenteditable="true">${detailParams[name]}</td></tr>`
-            element.productParams_table.insertAdjacentHTML('afterbegin', paramRow)
-         }
-      } else {
-         hide(element.productParams_wrapper)
       }
    }
 
@@ -177,6 +175,10 @@ class FillFields {
       const currentCatTnved = await API.searchTnved(currentCat.getAttribute('data-cat-name'))
       this.tnved(currentCatTnved)
       select.productCategory.addEventListener('change', async () => {
+         const changedCategory = select.productCategory.value.split(' --')[0]
+         const loadedFeautures = await API.searchFeautures(changedCategory)
+         new FeautureData(loadedFeautures.result.data).push()
+
          const categoryOptions = select.productCategory.options
          for(let cat of categoryOptions) {
             if(cat.selected) {

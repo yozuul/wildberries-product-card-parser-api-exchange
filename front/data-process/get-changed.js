@@ -12,12 +12,14 @@ class ChangedData {
       if(sizeNum > 0) {
          barcodeNums = sizeNum
       }
+      const barcodeGen = await API.genBarcodes(barcodeNums.toString())
+      input.productBarcode.value = barcodeGen
       return {
          inputsData: this.inputsValue(),
          selectData: this.selectValue(),
          feautures: this.feautures(),
          sizesData: sizes,
-         barcodes: await API.genBarcodes(barcodeNums.toString())
+         barcodes: barcodeGen
       }
    }
 
@@ -53,10 +55,17 @@ class ChangedData {
 
    feautures() {
       let feauturesData = {}
-      for(let feauture of element.productParams_table.children) {
-         feauturesData[feauture.children[0].innerText] = feauture.children[1].innerText
+      const addedFeautures = document.querySelectorAll('.addedFeautures')
+      for(let feauture of addedFeautures) {
+         const parent = feauture.parentElement.parentElement
+         const feautureName = parent.getAttribute('feautre-name')
+         feauturesData[feautureName] = []
       }
-      // console.log(feauturesData)
+      for(let feauture of addedFeautures) {
+         const parent = feauture.parentElement.parentElement
+         const feautureName = parent.getAttribute('feautre-name')
+         feauturesData[feautureName].push(feauture.children[0].innerText)
+      }
       return feauturesData
    }
 

@@ -8,35 +8,44 @@ class API {
          parseCard: `${apiHost}/parseCard`,
          createCard: `${apiHost}/createCard`,
          searchCategory: `${apiHost}/searchCategory`,
+         searchFeautures: `${apiHost}/searchFeautures`,
          searchTnved: `${apiHost}/searchTnved`,
          genBarcodes: `${apiHost}/genBarcodes`,
+         saveToken: `${apiHost}/saveToken`,
       }
    }
 
-   async parseCard(data) {
-      const parseCard = this.apiURL.parseCard;
-      const response = await this.fetch(data).post(parseCard);
-      return this.requestResult(response, parseCard)
+   async saveToken(data) {
+      const saveToken = this.apiURL.saveToken;
+      await this.fetch(data).post(saveToken);
+      return {save: 'ok'}
+      // return await this.requestResult(response, saveToken)
    }
-
+   async searchFeautures(data) {
+      const searchFeautures = this.apiURL.searchFeautures;
+      const response = await this.fetch(data).post(searchFeautures);
+      return await this.requestResult(response, searchFeautures)
+   }
    async searchCategory(data) {
       const searchCategory = this.apiURL.searchCategory;
       const response = await this.fetch(data).post(searchCategory);
       return this.requestResult(response, searchCategory)
    }
-
    async searchTnved(data) {
       const searchTnved = this.apiURL.searchTnved;
       const response = await this.fetch(data).post(searchTnved);
       return this.requestResult(response, searchTnved)
    }
-
+   async parseCard(data) {
+      const parseCard = this.apiURL.parseCard;
+      const response = await this.fetch(data).post(parseCard);
+      return this.requestResult(response, parseCard)
+   }
    async createCard(data) {
       const createCard = this.apiURL.createCard;
       const response = await this.fetch(JSON.stringify(data)).post(createCard);
       return this.requestResult(response, createCard)
    }
-
    async genBarcodes(quantity) {
       const genBarcodes = this.apiURL.genBarcodes;
       const response = await this.fetch(quantity).post(genBarcodes);
@@ -92,13 +101,19 @@ class API {
 var API$1 = new API();
 
 const query = (el) => document.querySelector(el);
+const queryAll = (el) => document.querySelectorAll(el);
 const hide = (el) => el.classList.add('dn');
 const show = (el) => el.classList.remove('dn');
 const insert = (el) => {
    return {
       after: {
          begin: (parent) => {
-            parent.insertAdjacentHTML('afterBegin', el);
+            parent.insertAdjacentHTML('afterbegin', el);
+         }
+      },
+      before: {
+         end: (parent) => {
+            parent.insertAdjacentHTML('beforeend', el);
          }
       }
    }
@@ -111,10 +126,13 @@ const input = {
    productBrand: query('#productBrand'),
    productPrice: query('#productPrice'),
    productConsist: query('#productConsist'),
+   productCountry: query('#productConsist'),
    searchProductCategory: query('#searchProductCategory'),
    watchSelectedCategory: query('#watchSelectedCategory'),
    productColor: query('#productColor'),
    currentUUID: query('#currentUUID'),
+   saveSelectedCat: query('#saveSelectedCat'),
+   productBarcode: query('#productBarcode'),
 };
 // Селекты
 const select = {
@@ -138,19 +156,31 @@ const element = {
    searchProductTnved_wrapper: query('#searchProductTnved_wrapper'),
    productParams_table: query('#productParams_table tbody'),
    searchResultList: query('#searchResultList'),
+   searchResultListInner: queryAll('#searchResultList li'),
    productSizes_wrapper: query('#productSizes_wrapper'),
    productSizes: query('#productSizes'),
    notify: query('#notify'),
    notifyHeader: query('#notifyHeader'),
    notifyText: query('#notifyText'),
+   productFeaut_wrapper: query('#productFeaut_wrapper'),
+   productFeautRequire_block: query('#productFeautRequire_block'),
+   productFeautOther_block: query('#productFeautOther_block'),
+   productFeautVariat_block: query('#productFeautVariat_block'),
+   productFeautInputs: queryAll('#productFeaut_wrapper input'),
+   parsedFeautures_wrapper: query('#parsedFeautures_wrapper'),
+   productBarcode_wrapper: query('#productBarcode_wrapper'),
+   addedFeautures: queryAll('.addedFeautures'),
 };
 const textarea = {
-   productDesc: query('#productDesc')
+   productDesc: query('#productDesc'),
+   token: query('#token')
 };
 // Кнопки
 const button = {
    parseCard: query('#parseCard'),
    saveCard: query('#saveCard'),
+   saveToken: query('#saveToken'),
+   closeModal: query('#closeModal'),
    changeAutoFindedCategory: query('#changeAutoFindedCategory'),
 };
 
@@ -200,19 +230,19 @@ class FieldsCleaner {
 
       // Очищаем поля
       const cleanElement = [
-         input.productConsist, input.productColor, input.watchSelectedCategory, textarea.productDesc
+         input.productConsist, input.productColor, input.watchSelectedCategory, textarea.productDesc, input.searchProductCategory
       ];
       cleanElement.map((el) => el.value = '');
 
       // Элементы которые надо спрятать
       const hideElement = [
-         button.saveCard, element.productImages_wrapper, element.productParams_wrapper, element.productExtras_wrapper, element.productConsist_wrapper, element.productColor_wrapper, element.productExtrasNotFound_wrapper, element.productSizes_wrapper
+         button.saveCard, element.productImages_wrapper, element.productParams_wrapper, element.productExtras_wrapper, element.productConsist_wrapper, element.productColor_wrapper, element.productExtrasNotFound_wrapper, element.productSizes_wrapper, element.productFeaut_wrapper
       ];
       hideElement.map((el) => hide(el));
 
       // Элементы у которых надо удалить дочерние элементы
       const cleanChilds = [
-         element.productImages, element.productParams_table, select.productCategory, select.productTnved, select.searchProductTnved, element.productSizes
+         element.productImages, element.productParams_table, select.productCategory, select.productTnved, select.searchProductTnved, element.productSizes, element.parsedFeautures_wrapper, element.productFeautRequire_block, element.productFeautOther_block
       ];
       cleanChilds.map((parent) => {
          if(parent.firstChild) {
@@ -227,6 +257,130 @@ class FieldsCleaner {
 }
 
 var FieldsCleaner$1 = new FieldsCleaner();
+
+class FeautureData {
+   constructor(data) {
+      this.data = data;
+   }
+
+   push() {
+      this.clean();
+      const pushedDataNotRequire = new ChildsPush(element.productFeautOther_block);
+      const pushedDataRequire = new ChildsPush(element.productFeautRequire_block);
+      let idData = {};
+      let index = 0;
+      for (let common of this.data.addin) {
+         if((common.type !== 'Бренд') && (common.type !== 'Тнвэд') && (common.type !== 'Описание') && (common.type !== 'Состав') && (common.type !== 'Наименование')) {
+            const feautureID = `feautureNum_${index}`;
+            const pushedDataString = `
+            <div class="row uploadedFeautureFields" feautre-name="${common.type}" id="${feautureID}">
+               <div class="col-10">
+                  <input type="text" class="form-control" placeholder="${common.type}">
+               </div>
+               <div class="col-2">
+                  <button class="btn btn-primary mb-3 addFeauture">+</button>
+               </div>
+               <ul class="col-12"></ul>
+            </div>`;
+            if ((common.required)) {
+               pushedDataRequire.collect(pushedDataString);
+            } else {
+               pushedDataNotRequire.collect(pushedDataString);
+            }
+            idData[common.type] = feautureID;
+            index++;
+         }
+      }
+      pushedDataRequire.insert();
+      pushedDataNotRequire.insert();
+      this.compareData(this.parsedFeautures, idData);
+      this.addListeneres();
+      show(element.productFeaut_wrapper);
+   }
+
+   addListeneres() {
+      const addFeautureButtons = document.querySelectorAll('#productFeaut_wrapper .addFeauture');
+      for(let addFeautureButton of addFeautureButtons) {
+         addFeautureButton.onclick = () => {
+            const blockID = addFeautureButton.parentElement.parentElement.id;
+            const blockInput = document.querySelector(`#${blockID} input`);
+            const blockFeautData = document.querySelector(`#${blockID} ul`);
+            if(blockInput.value) {
+               const template = `
+               <li class="addedFeautures">
+                  <small class="text-muted">${blockInput.value}</small>
+                  <button class="removeFeauture" onclick="this.parentElement.remove()">-</button>
+               </li>`;
+               insert(template).after.begin(blockFeautData);
+               blockInput.value = '';
+            }
+         };
+      }
+   }
+
+   compareData(parsedFeautures, idData) {
+      console.log(parsedFeautures);
+      for(let feautureName in parsedFeautures) {
+         const existFeautureFieldID = idData[feautureName];
+         if(existFeautureFieldID) {
+            const existFeutureBlock = document.querySelector(`#${existFeautureFieldID} ul`);
+            const parsedFeautureItem = parsedFeautures[feautureName];
+            const fillData = {
+               dest: existFeutureBlock,
+               value: parsedFeautureItem.value,
+            };
+            if(parsedFeautureItem.type == 'multiple') {
+               this.fillDataMultiple(fillData);
+            } else {
+               this.fillDataOnce(fillData);
+            }
+         }
+      }
+   }
+
+   fillDataMultiple(data) {
+      const checkSplit = data.value.split(';');
+      if(checkSplit)
+      for(let item of data.value.split(';')) {
+         const template = `
+         <li class="addedFeautures">
+            <small class="text-muted">${item}</small>
+            <button class="removeFeauture" onclick="this.parentElement.remove()">-</button>
+         </li>`;
+         insert(template).after.begin(data.dest);
+      }
+   }
+
+   fillDataOnce(data) {
+      const template = `
+      <li class="addedFeautures">
+         <small class="text-muted">${data.value}</small>
+         <button class="removeFeauture" onclick="this.parentElement.remove()">-</button>
+      </li>`;
+      insert(template).after.begin(data.dest);
+   }
+
+   get parsedFeautures() {
+      let data = {};
+      const parsedFeautures = document.querySelectorAll('#parsedFeautures_wrapper input');
+      for(let item of parsedFeautures) {
+         data[item.getAttribute('feauture-name')] = {
+            value: item.value,
+            type: item.classList.contains('multiple') ? 'multiple' : 'one'
+         };
+      }
+      return data
+   }
+
+   clean() {
+      const fondedLoad = document.querySelectorAll('.uploadedFeautureFields');
+      if(fondedLoad.length > 0) {
+         for(let item of fondedLoad) {
+            item.remove();
+         }
+      }
+   }
+}
 
 // ДИНАМИЧЕСКИЙ ПОИСК ПО API WILDBERRIES
 
@@ -244,13 +398,6 @@ class DynamicSearch {
             // Проверяем результат и показываем результат
             this.checkResult(isFind.result);
          }
-      };
-      // Если с поля поиска убран фокус
-      searchField.onblur = async () => {
-         hide(element.searchResultList);
-         input.searchProductCategory.value = input.watchSelectedCategory.value;
-         this.tryFoundTvend(input.watchSelectedCategory.value);
-         this.cleanResult(element.searchResultList);
       };
       // Если поле в фокусе
       searchField.onfocus = async () => {
@@ -319,11 +466,16 @@ class DynamicSearch {
 
    watchSearchItemClick(parent) {
       for(let foundedCategory of parent.children) {
-         foundedCategory.onmouseover = () => {
-            input.watchSelectedCategory.value = foundedCategory.getAttribute('data-cat-name');
+         foundedCategory.onclick = async () => {
+            input.searchProductCategory.value = foundedCategory.getAttribute('data-cat-name');
+            await this.tryFoundTvend(input.searchProductCategory.value);
+            this.cleanResult(element.searchResultList);
+            let data = await API$1.searchFeautures(input.searchProductCategory.value);
+            new FeautureData(data.result.data).push();
          };
       }
    }
+
 
    cleanResult(parent) {
       while (parent.firstChild) {
@@ -341,13 +493,34 @@ class DynamicSearch {
    }
 }
 
+class NormalizeFeauture {
+   checkUnits(value) {
+      const patternName = {
+         sm: ' см', gr: ' г', kg: ' кг', mm: ' мм', mp: ' Мп', mhz: ' МГц', min: ' мин', h: ' час', qu: ' шт.', grad: ' градусов', temp: ' C', noize: ' дБ', ml: ' мл', kkal: ' ккал', plot: ' г/кв.м'
+      };
+      const unitCheck = (str) => {
+         return {
+            sm: str.slice(-3), gr: str.slice(-2), kg: str.slice(-3), mm: str.slice(-3), mp: str.slice(-3), mhz: str.slice(-4), min: str.slice(-4), h: str.slice(-4), qu: str.slice(-4), grad: str.slice(-9), temp: str.slice(-2), noize: str.slice(-3), ml: str.slice(-3), kkal: str.slice(-5), plot: str.slice(-7)
+         }
+      };
+      for(let item in patternName) {
+         const pattern = unitCheck(value)[item];
+         if(patternName[item] == pattern) {
+            const unitValue = value.split(pattern)[0];
+            if (parseInt(unitValue)) {
+               return unitValue
+            }
+         }
+      }
+   }
+}
+
 // ЗАПОЛНЕНИЕ ПОЛЕЙ ПОЛУЧЕННЫМИ ДАННЫМИ
 
 class FillFields {
    constructor(parseData) {
       this.parseData = parseData;
    }
-
    async passData() {
       const data = this.parseData;
       // ЧТО СПАРСИЛИ:
@@ -360,13 +533,26 @@ class FillFields {
       // Цвет
       this.color(data);
       // Характеристики
-      this.features(data);
+      this.features(data.details.params);
       // ЧТО ПОЛУЧИЛИ ПО API:
       // Категория
       await this.category(data.extras.direcoryList);
       // Размеры
       this.sizes(data.source.nomenclatures);
       input.currentUUID.value = this.parseData.extras.uuid;
+   }
+
+   features(params) {
+      const normalizer = new NormalizeFeauture();
+      let objectNum = 'one';
+      for(let paramName in params) {
+         let pasteData = params[paramName];
+         const normalized = normalizer.checkUnits(params[paramName]);
+         normalized ? pasteData = normalized : '';
+         if(pasteData.split(';').length > 0) objectNum = 'multiple';
+         const input = `<input class="${objectNum}" type="text" feauture-name="${paramName}" value="${pasteData}">`;
+         insert(input).after.begin(element.parsedFeautures_wrapper);
+      }
    }
 
    // Категории
@@ -390,7 +576,11 @@ class FillFields {
          pushedData.insert();
          show(element.productExtras_wrapper);
          // Следим за изменением активной категории
-         this.watchCatChanged(select.productCategory.options[0]);
+         const activeCat = select.productCategory.options[0];
+         this.watchCatChanged(activeCat);
+         // Подгружаем данные характеристик
+         const loadedFeautures = await API$1.searchFeautures(activeCat.getAttribute('data-cat-name'));
+         new FeautureData(loadedFeautures.result.data).push();
          // Открыть поиск категорий
          this.showDynamicSearch();
          return true
@@ -416,28 +606,26 @@ class FillFields {
 
    // Размеры
    sizes(data) {
-      let variationNum = 0;
+      let filterSizes = {};
       for (let product in data) {
-         if (variationNum < 1) {
-            const productItem = data[product];
-           let sizeNum = 0;
-            for (let foundedSize in productItem.sizes) {
-               const item = productItem.sizes[foundedSize];
-               if ((item.sizeName !== 0) && (item.quantity !== 0)) {
-                  const sizeItem = `<div class="col form-control sizeCol" data-ru-size="${item.sizeNameRus}">${item.sizeName}</div>`;
-                  insert(sizeItem).after.begin(element.productSizes);
-               }
-               if(sizeNum > 0) {
-                  show(element.productSizes_wrapper);
-               }
-               sizeNum++;
+         const sizes = data[product].sizes;
+         const firstItemID = Object.keys(sizes)[0];
+         const firsItemSize = sizes[firstItemID].sizeName;
+         if(firsItemSize !== 0) {
+            for(let item in sizes) {
+               const size = sizes[item];
+               filterSizes[size.sizeName] = size.sizeNameRus;
             }
-            variationNum++;
          }
       }
+      for(let sizeName in filterSizes) {
+         const sizeItem = `<div class="col form-control sizeCol" data-ru-size="${filterSizes[sizeName]}">${sizeName}</div>`;
+         insert(sizeItem).after.begin(element.productSizes);
+      }
+      show(element.productSizes_wrapper);
    }
 
-   // Наименование / бренд / цена / описание
+   // Наименование / бренд / цена / описание / Страна
    defaultField(data) {
       const commonDataFields = {
          productName: input.productName,
@@ -449,10 +637,6 @@ class FillFields {
          commonDataFields[input].value = data[input];
       }
 
-      for(let input in commonDataFields) {
-         commonDataFields[input].removeAttribute('readonly');
-         commonDataFields[input].value = data[input];
-      }
       const detailDesc = data.details.desc;
       textarea.productDesc.removeAttribute('readonly');
       if(detailDesc) {
@@ -488,25 +672,11 @@ class FillFields {
    // Цвет
    color(data) {
       const productColor = data.productColor;
-      if(productColor !== 'null') {
+      if((productColor) && (productColor !== 'null')) {
          show(element.productColor_wrapper);
          input.productColor.value = productColor;
       } else {
          hide(element.productColor_wrapper);
-      }
-   }
-
-   // Характеристики
-   features(data) {
-      const detailParams = data.details.params;
-      if(detailParams) {
-         show(element.productParams_wrapper);
-         for(let name in detailParams) {
-            const paramRow = `<tr><th contenteditable="true">${name}</th><td contenteditable="true">${detailParams[name]}</td></tr>`;
-            element.productParams_table.insertAdjacentHTML('afterbegin', paramRow);
-         }
-      } else {
-         hide(element.productParams_wrapper);
       }
    }
 
@@ -515,6 +685,10 @@ class FillFields {
       const currentCatTnved = await API$1.searchTnved(currentCat.getAttribute('data-cat-name'));
       this.tnved(currentCatTnved);
       select.productCategory.addEventListener('change', async () => {
+         const changedCategory = select.productCategory.value.split(' --')[0];
+         const loadedFeautures = await API$1.searchFeautures(changedCategory);
+         new FeautureData(loadedFeautures.result.data).push();
+
          const categoryOptions = select.productCategory.options;
          for(let cat of categoryOptions) {
             if(cat.selected) {
@@ -557,122 +731,33 @@ class PrepareData {
     this.updates = updates;
   }
   collect() {
-    // console.log(this.parseData);
-    // console.log(this.updates);
-    // console.log(this.bodyObject());
     return this.bodyObject()
   }
-
-
- checkMultiple(value) {
-    let multipleParams = [];
-    const trySplit = value.split('; ');
-    if(trySplit[1]) {
-      let index = 1;
-      for(let item of trySplit) {
-        if(index < 3) {
-          multipleParams.push({value: item});
-        }
-        index++;
-      }
-      return multipleParams
-    } else {
-      return value
-    }
- }
-
- checkUnits(value) {
-     const patternName = {
-       sm: ' см', sm2: ' см', gr: ' г', kg: ' кг', mm: ' мм', mp: ' Мп', mhz: ' МГц'
-     };
-     const unitCheck = (str) => {
-       return {
-        sm: str.slice(-3), sm2: str.slice(-3), gr: str.slice(-2), kg: str.slice(-3),
-        mm: str.slice(-3), mp: str.slice(-3), mhz: str.slice(-4)
-       }
-     };
-     for (let unit in patternName) {
-       const pattern = unitCheck(value)[unit];
-       if (pattern == patternName[unit]) {
-         const unitValue = value.split(pattern)[0];
-         if(parseInt(unitValue)) {
-          //  console.log('value', value);
-          //  console.log('unitValue', unitValue);
-            return unitValue
-         }
-       }
-     }
- }
-
- collectFeautures(data) {
-   const paramsData = [];
-   const feauturesData = data;
-
-   let feauturesParams = {};
-   for (const feauture in feauturesData) {
-     if ((feauture !== 'Страна производства') && (feauture)) {
-       console.log(feauture);
-       const value = feauturesData[feauture];
-       // console.log('value', value);
-       const checked = this.checkType(value);
-       // console.log('checked', checked);
-       if (checked) {
-         feauturesParams[feauture] = {
-           type: feauture,
-           params: checked
-         };
-       }
-     }
-   }
-   for (let param in feauturesParams) {
-     paramsData.push(feauturesParams[param]);
-   }
-   // console.log('paramsData', paramsData);
-   // console.log(paramsData);
-   return paramsData
- }
-
- checkType(value) {
-    let result = [];
-    // Если есть единицы измерения
-    const isUnit = this.checkUnits(value);
-    // console.log(value);
-    if(isUnit) {
-      result.push({value: isUnit});
-      return result
-      // console.log('isUnit result', result);
-    }
-    // // Если значений несколько
-    const isMultiply = this.checkMultiple(value);
-    if(isMultiply) {
-      if(typeof isMultiply !== 'string') {
-        result = isMultiply;
-        return result
-        // console.log('isMultiply', isMultiply)
-      } else {
-        result.push({ value: value});
-        return result
-      }
-    }
-    // console.log('value', value);
-    // console.log('result', result);
- }
 
   bodyObject() {
     const vendorCode = Math.floor(Math.random() * 1000000000);
     const { inputsData, feautures, selectData, sizesData, barcodes } = this.updates;
+    const country = this.parseData.details.params['Страна производства'];
     const body = {
       params: {
         card: {
-          countryProduction: feautures['Страна производства'],
+          name: inputsData.productName,
+          countryProduction: country || 'Россия',
           object: selectData.productCategory,
-          addin: [{...this.getConsist(inputsData.productConsist)},
+          addin: [
             { type: "Бренд",
               params: [{ value: inputsData.productBrand}]
+            },
+            { type: "Наименование",
+              params: [{ value: inputsData.productName}]
+            },
+            { type: "Описание",
+              params: [{ value: this.parseData.details.desc}]
             },
             { type: "Тнвэд",
               params: [{ value: selectData.productTnved }]
             },
+            {...this.getConsist(inputsData.productConsist)},
             ...this.collectFeautures(feautures)
           ],
           nomenclatures: [{
@@ -694,6 +779,47 @@ class PrepareData {
     return body
   }
 
+  // Состав
+  getConsist(data) {
+    const consist = { type: "Состав", params: [] };
+    if (data) {
+       const multipleConsists = data.split(', ');
+        for (let item of multipleConsists) {
+           const spaceIndex = item.lastIndexOf(' ');
+           consist.params.push({
+              value: item.slice(0, spaceIndex),
+              count: parseInt(item.slice(spaceIndex + 1, -1))
+           });
+        }
+        return consist
+    } else {
+       return {}
+    }
+  }
+
+  collectFeautures(data) {
+    const feauturesParams = {};
+    const paramsData = [];
+
+    for (const feauture in data) {
+      const value = data[feauture];
+      feauturesParams[feauture] = {
+        type: feauture, params: []
+      };
+      for(let feautureValues of value) {
+        feauturesParams[feauture].params.push({
+          value: feautureValues
+        });
+      }
+    }
+
+    for(let item in feauturesParams) {
+      paramsData.push(feauturesParams[item]);
+    }
+
+    return paramsData
+  }
+
   // Размеры
   getVariations(data) {
     let variationsData = '';
@@ -709,11 +835,8 @@ class PrepareData {
    const product = [{
      barcode: data.barcodes[0],
      addin: [
-       {
-       type: "Розничная цена",
-       params: [{ count: parseInt(data.price) }]
-      }
-    ]
+       { type: "Розничная цена",
+       params: [{ count: parseInt(data.price) }] }]
    }];
    return product
  }
@@ -749,25 +872,6 @@ class PrepareData {
     }
     return images
   }
-
-  // Состав
-  getConsist(data) {
-    const consist = { type: "Состав", params: [] };
-    if (data) {
-       const multipleConsists = data.split(', ');
-        for (let item of multipleConsists) {
-           const spaceIndex = item.lastIndexOf(' ');
-           consist.params.push({
-              value: item.slice(0, spaceIndex),
-              count: parseInt(item.slice(spaceIndex + 1, -1))
-           });
-        }
-        return consist
-    } else {
-       return {}
-    }
-  }
-
 }
 
 // СОБИРАЕМ ОТРЕДАКТИРОВАННЫЕ В ПАНЕЛИ ДАННЫЕ
@@ -781,12 +885,14 @@ class ChangedData {
       if(sizeNum > 0) {
          barcodeNums = sizeNum;
       }
+      const barcodeGen = await API$1.genBarcodes(barcodeNums.toString());
+      input.productBarcode.value = barcodeGen;
       return {
          inputsData: this.inputsValue(),
          selectData: this.selectValue(),
          feautures: this.feautures(),
          sizesData: sizes,
-         barcodes: await API$1.genBarcodes(barcodeNums.toString())
+         barcodes: barcodeGen
       }
    }
 
@@ -822,10 +928,17 @@ class ChangedData {
 
    feautures() {
       let feauturesData = {};
-      for(let feauture of element.productParams_table.children) {
-         feauturesData[feauture.children[0].innerText] = feauture.children[1].innerText;
+      const addedFeautures = document.querySelectorAll('.addedFeautures');
+      for(let feauture of addedFeautures) {
+         const parent = feauture.parentElement.parentElement;
+         const feautureName = parent.getAttribute('feautre-name');
+         feauturesData[feautureName] = [];
       }
-      // console.log(feauturesData)
+      for(let feauture of addedFeautures) {
+         const parent = feauture.parentElement.parentElement;
+         const feautureName = parent.getAttribute('feautre-name');
+         feauturesData[feautureName].push(feauture.children[0].innerText);
+      }
       return feauturesData
    }
 
@@ -864,6 +977,7 @@ class Notifier {
       element.notifyText.innerText = `Wildberries response: \n${data.body}`;
    }
    correct(text) {
+      element.notifyText.classList.remove('error');
       this.toggle();
       element.notifyHeader.innerText = `Операция выполнена`;
       element.notifyText.innerText = text;
@@ -878,7 +992,6 @@ class Notifier {
       }
       const popup = () => {
          element.notify.classList.remove('show');
-         element.notifyText.classList.remove('error');
          show(button.parseCard);
          show(button.saveCard);
       };
@@ -901,15 +1014,17 @@ class ParsePanel {
          fetchSpinner('on');
          // Парсим карточку
          const parseData = await API$1.parseCard(input.productURL.value);
+         this.checkParse(parseData);
          // Заполняем полученными данными поля в панели
          new FillFields(parseData).passData();
-         // // Показываем кнопку добавления карточки
+         // Показываем кнопку добавления карточки
          show(button.saveCard);
          // // Выключаем спиннер
          fetchSpinner('off');
          // Передаём данные парсинга для добавления
          this.addProductButtonControl(parseData);
       };
+      this.saveToken();
    }
    // Кнопка сохранения карточки
    addProductButtonControl(parseData) {
@@ -919,13 +1034,24 @@ class ParsePanel {
             const updatedFields = await new ChangedData().collect();
             // Формируем тело запроса
             const postData = new PrepareData(parseData, updatedFields).collect();
-            console.log('updatedFields', updatedFields);
+            console.log('parseData', parseData);
+            // console.log('updatedFields', updatedFields);
             console.log('postData', postData);
             // Отправляем карточку в Wildberries
             const response = await API$1.createCard(postData);
             this.notifiers.wdError(response);
          } else {
             this.notifiers.error('Добавьте категорию');
+         }
+      };
+   }
+
+   saveToken() {
+      button.saveToken.onclick = async () => {
+         const response = await API$1.saveToken(textarea.token.value);
+         if(response.save == 'ok') {
+            button.closeModal.click();
+            this.notifiers.correct('Токен успешно обновлен');
          }
       };
    }
@@ -952,6 +1078,12 @@ class ParsePanel {
       }
    }
 
+   checkParse(parseData) {
+      if(parseData.type) {
+         this.notifiers.error(parseData.text);
+      }
+   }
+
    checkCategory() {
       const visible = (el) => {
          if(el.classList.contains('dn')) {
@@ -965,7 +1097,8 @@ class ParsePanel {
          } else { return true }
       } else { return true }
    }
-
 }
+
+
 
 new ParsePanel().registerButtons();

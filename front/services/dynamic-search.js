@@ -1,5 +1,6 @@
 import API from './api'
 import { element, input, select } from '../data-process/queries'
+import {FeautureData } from '../data-process/fetch-features'
 import { show, hide, ChildsPush } from '../utils/index'
 
 // ДИНАМИЧЕСКИЙ ПОИСК ПО API WILDBERRIES
@@ -18,13 +19,6 @@ class DynamicSearch {
             // Проверяем результат и показываем результат
             this.checkResult(isFind.result)
          }
-      }
-      // Если с поля поиска убран фокус
-      searchField.onblur = async () => {
-         hide(element.searchResultList)
-         input.searchProductCategory.value = input.watchSelectedCategory.value
-         this.tryFoundTvend(input.watchSelectedCategory.value)
-         this.cleanResult(element.searchResultList)
       }
       // Если поле в фокусе
       searchField.onfocus = async () => {
@@ -93,11 +87,16 @@ class DynamicSearch {
 
    watchSearchItemClick(parent) {
       for(let foundedCategory of parent.children) {
-         foundedCategory.onmouseover = () => {
-            input.watchSelectedCategory.value = foundedCategory.getAttribute('data-cat-name')
+         foundedCategory.onclick = async () => {
+            input.searchProductCategory.value = foundedCategory.getAttribute('data-cat-name')
+            await this.tryFoundTvend(input.searchProductCategory.value)
+            this.cleanResult(element.searchResultList)
+            let data = await API.searchFeautures(input.searchProductCategory.value)
+            new FeautureData(data.result.data).push()
          }
       }
    }
+
 
    cleanResult(parent) {
       while (parent.firstChild) {

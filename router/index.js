@@ -1,6 +1,6 @@
 import fse from 'fs-extra'
 
-import { writeFile } from 'fs/promises';
+import { writeFile, readFile } from 'fs/promises';
 import { Buffer } from 'buffer';
 
 import Router from '@koa/router'
@@ -11,6 +11,30 @@ import { green, darkGray, red } from 'ansicolor'
 import { WildberriesAPI } from '../api/wildberries'
 
 const router = new Router()
+
+async function saveToken(token) {
+}
+
+router.post('/saveToken', async (ctx) => {
+   try {
+      try {
+         const newToken = `WD_TOKEN=${ctx.request.body}`
+         const data = Buffer.from(newToken);
+         await writeFile('.env', data);
+         ctx.body = {save: 'ok'}
+         ctx.status = 200
+      } catch (err) {
+         // When a request is aborted - err is an AbortError
+         console.error(err);
+      }
+
+   }
+   catch (err) {
+      console.log('Error:', (err).red)
+      ctx.status = 500,
+      ctx.body = `Internal error at parseCard`
+   }
+})
 
 router.post('/createCard', async (ctx) => {
    try {
@@ -37,6 +61,18 @@ router.post('/parseCard', async (ctx) => {
       console.log('Error:', (err).red)
       ctx.status = 500,
       ctx.body = `Internal error at parseCard`
+   }
+})
+
+router.post('/searchFeautures', async (ctx) => {
+   try {
+      ctx.body = await new WildberriesAPI().searchFeautures(ctx.request.body)
+      ctx.status = 200
+   }
+   catch (err) {
+      console.log('Error:', (err).red)
+      ctx.status = 500,
+      ctx.body = `Internal error at searchCategory`
    }
 })
 
@@ -75,6 +111,7 @@ router.post('/genBarcodes', async (ctx) => {
       ctx.body = `Internal error at searchTnved`
    }
 })
+
 
 async function writeJson(data) {
    const tempFile = './.exports/temp.json'
